@@ -1,14 +1,12 @@
-from collections import Counter
 from typing import Dict, List, Any
 
 import numpy as np
 import pandas as pd
 
-from source.data import DataLoader
-from source.utils import timer
+from source.data import DataLoader, DataProcessor
 
 
-class DataExplorer:
+class DataExplorer(DataProcessor):
     """
     Class for comprehensive data exploration and analysis.
 
@@ -16,42 +14,38 @@ class DataExplorer:
     and perform basic analysis relevant to review data.
     """
     def __init__(self, df: pd.DataFrame):
-        self.__df = df.copy()
-
-    def _validate_column_exists(self, column_name: str) -> None:
-        if column_name not in self.__df.columns:
-            raise ValueError(f"Column '{column_name}' not found in dataframe")
+        super().__init__(df)
 
     def _validate_numeric_column(self, column_name: str) -> None:
         self._validate_column_exists(column_name)
-        if not pd.api.types.is_numeric_dtype(self.__df[column_name]):
+        if not pd.api.types.is_numeric_dtype(self._df[column_name]):
             raise ValueError(f"Column '{column_name}' is not numeric")
 
     def columns_info(self) -> np.ndarray:
-        return self.__df.columns.values
+        return self._df.columns.values
 
     def label_distribution(self, label_name: str = "label") -> pd.Series:
         self._validate_column_exists(label_name)
-        return self.__df[label_name].value_counts()
+        return self._df[label_name].value_counts()
 
     def show_head(self, n: int = 10) -> pd.DataFrame:
-        return self.__df.head(n)
+        return self._df.head(n)
 
     def data_shape(self) -> tuple:
-        return self.__df.shape
+        return self._df.shape
 
     def data_types(self) -> pd.Series:
-        return self.__df.dtypes
+        return self._df.dtypes
 
     def missing_values(self) -> pd.Series:
-        return self.__df.isnull().sum()
+        return self._df.isnull().sum()
 
     def missing_values_percentage(self) -> pd.Series:
-        return (self.__df.isnull().sum() / len(self.__df) * 100).round(2)
+        return (self._df.isnull().sum() / len(self._df) * 100).round(2)
 
     def text_length_stats(self, text_column="text_") -> Dict[str, float]:
         self._validate_column_exists(text_column)
-        lengths = self.__df[text_column].dropna().apply(len)
+        lengths = self._df[text_column].dropna().apply(len)
         return {
             "min": lengths.min(),
             "max": lengths.max(),
@@ -63,7 +57,7 @@ class DataExplorer:
     def most_common_words(self, text_column="text_", n=10) -> List[tuple]:
         self._validate_column_exists(text_column)
         words = dict()
-        for word_list in self.__df[text_column].dropna().str.split():
+        for word_list in self._df[text_column].dropna().str.split():
             for word in word_list:
                 word = word.lower().strip('.,!?;:"()[]{}')
                 if word in words:
@@ -81,8 +75,8 @@ class DataExplorer:
         self._validate_column_exists(rating_column)
         self._validate_column_exists(label_column)
         crosstab_absolute = pd.crosstab(
-            self.__df[rating_column],
-            self.__df[label_column],
+            self._df[rating_column],
+            self._df[label_column],
             margins=True,
             margins_name='Всего'
         )
@@ -190,5 +184,3 @@ if __name__ == "__main__":
     yelp = loader.load_from_kaggle(**yelp_set)
     explorer = DataExplorer(yelp)
     explorer.print_summary(text_column="text", label_column="label")
-
-
