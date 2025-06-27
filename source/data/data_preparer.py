@@ -1,12 +1,16 @@
 import re
 import string
-from typing import Optional, List, Any, Union
+from typing import Optional, List, Any, Union, Tuple, Dict
 
 import pandas as pd
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer, PorterStemmer
+from pandas import DataFrame, Series
+from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from source.data import DataLoader, DataProcessor
+
+from source.classes.data_processor import DataProcessor
+from source.data import DataLoader
 
 import nltk
 try:
@@ -33,6 +37,7 @@ class DataPreparer(DataProcessor):
     """
     def __init__(self, df: pd.DataFrame):
         super().__init__(df)
+        self.__label_mapping: Optional[Dict[Any, int]] = None
         self.__original_df = df.copy()
         self.__lemmatizer = WordNetLemmatizer()
         self.__stemmer = PorterStemmer()
@@ -142,11 +147,52 @@ class DataPreparer(DataProcessor):
         feature_matrix = vectorizer.fit_transform(texts)
         return feature_matrix
 
+    def encode_labels(self, label_column: str) -> 'DataPreparer':
+        self._validate_column_exists(label_column)
+
+        if pd.api.types.is_numeric_dtype(self._df[label_column]):
+            print(f"Label column '{label_column}' is already numeric. No encoding needed.")
+            return self
+
+        unique_labels = self._df[label_column].astype('category').cat.categories
+        self.__label_mapping = {label: i for i, label in enumerate(unique_labels)}
+
+        print(f"Encoding labels in '{label_column}'. Mapping created: {self.__label_mapping}")
+        self._df[label_column] = self._df[label_column].map(self.__label_mapping)
+        self._df[label_column] = self._df[label_column].astype(int)
+
+        return self
+
+    def get_label_mapping(self) -> Optional[Dict[Any, int]]:
+        return self.__label_mapping
+    
+    def get_features_and_labels(self,
+                                text_column: str,
+                                label_column: str,
+                                vectorizer_method: str = 'tfidf',
+                                **vectorizer_kwargs: Any) -> tuple[DataFrame, Any]:
+        self._validate_column_exists(text_column)
+        self._validate_column_exists(label_column)
+
+        print(f"Vectorizing text from '{text_column}' using '{vectorizer_method}'...")
+        feature_matrix = self.create_text_features(
+            text_column=text_column,
+            method=vectorizer_method,
+            **vectorizer_kwargs
+        )
+        print(f"Feature matrix shape: {feature_matrix.shape}")
+
+        labels = self._df[label_column]
+        print(f"Extracted labels from '{label_column}'. Shape: {labels.shape}")
+
+        return feature_matrix, labels
+
     def prepare_df(self,
                    handle_missing_strategy: str = 'drop',
                    handle_missing_columns: Optional[List[str]] = None,
                    handle_missing_fill_value: Any = None,
                    drop_duplicates_subset: Optional[List[str]] = None,
+                   encode_label_col: Optional[str] = None,
                    clean_text_col: Optional[str] = None,
                    clean_text_methods: Optional[List[str]] = None,
                    clean_text_stopwords_lang: Optional[str] = 'english',
@@ -161,12 +207,17 @@ class DataPreparer(DataProcessor):
             fill_value=handle_missing_fill_value
         )
         print(f"DataFrame shape after handling missing values: {self._df.shape}")
-        print("Dropping duplicates...")
-        initial_rows = len(self._df)
-        self.drop_duplicates(subset=drop_duplicates_subset)
-        rows_after_duplicates = len(self._df)
-        print(f"Dropped {initial_rows - rows_after_duplicates} duplicate rows.")
-        print(f"DataFrame shape after dropping duplicates: {self._df.shape}")
+        if drop_duplicates_subset is not None:
+            print("Dropping duplicates...")
+            initial_rows = len(self._df)
+            self.drop_duplicates(subset=drop_duplicates_subset)
+            rows_after_duplicates = len(self._df)
+            print(f"Dropped {initial_rows - rows_after_duplicates} duplicate rows.")
+            print(f"DataFrame shape after dropping duplicates: {self._df.shape}")
+
+        if encode_label_col:
+            self.encode_labels(label_column=encode_label_col)
+
         if clean_text_col:
             print(f"Cleaning text column: '{clean_text_col}'...")
             self.clean_text_column(

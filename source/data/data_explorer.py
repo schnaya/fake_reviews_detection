@@ -3,7 +3,9 @@ from typing import Dict, List, Any
 import numpy as np
 import pandas as pd
 
-from source.data import DataLoader, DataProcessor
+from source.classes.data_processor import DataProcessor
+from source.data import DataLoader
+
 
 
 class DataExplorer(DataProcessor):
