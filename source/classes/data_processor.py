@@ -10,3 +10,6 @@ class DataProcessor:
     def _validate_column_exists(self, column_name: str) -> None:
         if column_name not in self._df.columns:
             raise ValueError(f"Column '{column_name}' not found in dataframe")
+
+    def get_result(self) -> pd.DataFrame:
+        return self._df.copy()

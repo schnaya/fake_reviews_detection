@@ -7,7 +7,6 @@ from source.classes.data_processor import DataProcessor
 from source.data import DataLoader
 
 
-
 class DataExplorer(DataProcessor):
     """
     Class for comprehensive data exploration and analysis.

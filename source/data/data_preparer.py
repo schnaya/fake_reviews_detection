@@ -1,30 +1,14 @@
 import re
 import string
-from typing import Optional, List, Any, Union, Tuple, Dict
-
+from typing import Optional, List, Any, Union, Dict
 import pandas as pd
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer, PorterStemmer
-from pandas import DataFrame, Series
-from scipy.sparse import csr_matrix
+from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 
 from source.classes.data_processor import DataProcessor
 from source.data import DataLoader
 
-import nltk
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords')
-try:
-    nltk.data.find('corpora/wordnet')
-except LookupError:
-    nltk.download('wordnet')
-try:
-    nltk.data.find('corpora/omw-1.4')
-except LookupError:
-    nltk.download('omw-1.4')
+from source.data.text_cleaner import TextCleaner
 
 
 class DataPreparer(DataProcessor):
@@ -39,9 +23,16 @@ class DataPreparer(DataProcessor):
         super().__init__(df)
         self.__label_mapping: Optional[Dict[Any, int]] = None
         self.__original_df = df.copy()
-        self.__lemmatizer = WordNetLemmatizer()
-        self.__stemmer = PorterStemmer()
-        self.__stop_words = set(stopwords.words('english'))
+        self._vectorizer = CountVectorizer()
+        self.__text_cleaner = TextCleaner()
+
+    @property
+    def vectorizer(self):
+        return self._vectorizer
+
+    @vectorizer.setter
+    def vectorizer(self, vectorizer):
+        self._vectorizer = vectorizer
 
     def reset(self) -> 'DataPreparer':
         self._df = self.__original_df.copy()
@@ -87,64 +78,41 @@ class DataPreparer(DataProcessor):
         self._df.drop_duplicates(subset=subset, keep='first', inplace=True)
         return self
 
-    def __clean_text(self, text: str, methods: List[str], lemmatize: bool, stem: bool) -> str:
-        if not isinstance(text, str):
-            return ""
-
-        cleaned_text = text
-
-        if 'lower' in methods:
-            cleaned_text = cleaned_text.lower()
-
-        if 'remove_punctuation' in methods:
-            cleaned_text = cleaned_text.translate(str.maketrans('', '', string.punctuation))
-
-        if 'remove_numbers' in methods:
-            cleaned_text = re.sub(r'\d+', '', cleaned_text)
-
-        if 'remove_whitespace' in methods:
-            cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
-        words = cleaned_text.split()
-
-        if 'remove_stopwords' in methods:
-            words = [word for word in words if word not in self.__stop_words]
-        if lemmatize:
-            words = [self.__lemmatizer.lemmatize(word) for word in words]
-        if stem:
-            words = [self.__stemmer.stem(word) for word in words]
-
-        return ' '.join(words)
-
     def clean_text_column(self, text_column: str, methods: Optional[List[str]] = None,
                           stop_words_lang: Optional[str] = 'english', lemmatize: bool = False,
                           stem: bool = False) -> 'DataPreparer':
         self._validate_column_exists(text_column)
-        if stop_words_lang and stop_words_lang != 'english':
-            try:
-                self.__stop_words = set(stopwords.words(stop_words_lang))
-            except OSError:
-                raise ValueError(
-                    f"Stop words language '{stop_words_lang}' not supported by NLTK or data not downloaded.")
-        methods_list = methods if methods is not None else []
-        self._df[text_column] = self._df[text_column].apply(
-            lambda x: self.__clean_text(x, methods_list, lemmatize, stem)
+        text_cleaner = TextCleaner(
+            methods=methods,
+            stop_words_lang=stop_words_lang,
+            lemmatize=lemmatize,
+            stem=stem
         )
+        self._df[text_column] = text_cleaner.clean_series(self._df[text_column])
         return self
+
+    @staticmethod
+    def _create_vectorizer(method: str, **kwargs):
+        """Create vectorizer using the same logic as create_text_features method."""
+        if method == 'tfidf':
+            return TfidfVectorizer(**kwargs)
+        elif method == 'count':
+            return CountVectorizer(**kwargs)
+        else:
+            raise ValueError(f"Vectorization method '{method}' is not supported. Choose from 'tfidf', 'count'.")
 
     def create_text_features(self,
                              text_column: str,
                              method: str = 'tfidf',
+                             update_state: bool = True,
                              **kwargs) -> Union[pd.DataFrame, pd.DataFrame]:
         self._validate_column_exists(text_column)
         texts = self._df[text_column].fillna('').astype(str)
 
-        if method == 'tfidf':
-            vectorizer = TfidfVectorizer(**kwargs)
-        elif method == 'count':
-            vectorizer = CountVectorizer(**kwargs)
-        else:
-            raise ValueError(f"Vectorization method '{method}' is not supported. Choose from 'tfidf', 'count'.")
+        vectorizer = self._create_vectorizer(method, **kwargs)
         feature_matrix = vectorizer.fit_transform(texts)
+        if update_state:
+            self.vectorizer = vectorizer
         return feature_matrix
 
     def encode_labels(self, label_column: str) -> 'DataPreparer':
@@ -231,8 +199,7 @@ class DataPreparer(DataProcessor):
         print("Data preparation complete.")
         return self
 
-    def get_result(self) -> pd.DataFrame:
-        return self._df.copy()
+
 
 
 if __name__ == '__main__':
