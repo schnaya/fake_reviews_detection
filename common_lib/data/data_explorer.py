@@ -3,8 +3,8 @@ from typing import Dict, List, Any
 import numpy as np
 import pandas as pd
 
-from source.classes.data_processor import DataProcessor
-from source.data import DataLoader
+from common_lib.classes.data_processor import DataProcessor
+from common_lib.data import DataLoader
 
 
 class DataExplorer(DataProcessor):

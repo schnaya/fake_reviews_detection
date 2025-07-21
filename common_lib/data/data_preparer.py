@@ -5,10 +5,10 @@ import pandas as pd
 from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 
-from source.classes.data_processor import DataProcessor
-from source.data import DataLoader
+from common_lib.classes.data_processor import DataProcessor
+from common_lib.data import DataLoader
 
-from source.data.text_cleaner import TextCleaner
+from common_lib.data.text_cleaner import TextCleaner
 
 
 class DataPreparer(DataProcessor):

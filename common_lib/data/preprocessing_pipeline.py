@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.pipeline import Pipeline
 
 from common_lib.data import DataPreparer
-from source.text_transformers.text_cleaner_transformer import TextCleanerTransformer
+from common_lib.text_transformers.text_cleaner_transformer import TextCleanerTransformer
 
 
 class PreprocessingPipelineBuilder(DataPreparer):

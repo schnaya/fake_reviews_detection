@@ -3,7 +3,7 @@ from typing import Optional, List
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 
-from source.data.text_cleaner import TextCleaner
+
 
 
 class TextCleanerTransformer(BaseEstimator, TransformerMixin):
@@ -19,7 +19,7 @@ class TextCleanerTransformer(BaseEstimator, TransformerMixin):
         self.stop_words_lang = stop_words_lang
         self.lemmatize = lemmatize
         self.stem = stem
-
+        from common_lib.data.text_cleaner import TextCleaner
         self._text_cleaner = TextCleaner(
             methods=methods,
             stop_words_lang=stop_words_lang,

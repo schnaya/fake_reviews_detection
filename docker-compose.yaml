@@ -39,13 +39,6 @@ services:
     container_name: event-planner-ml-worker-coms
     restart: unless-stopped
     env_file: .env
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [ gpu ]
     depends_on:
       database:
         condition: service_healthy

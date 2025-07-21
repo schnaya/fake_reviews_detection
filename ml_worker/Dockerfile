@@ -16,7 +16,7 @@ COPY ml_worker/requirements.txt ml_worker_requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r ml_worker_requirements.txt
 RUN mkdir -p ${MODEL_DIR}
-COPY trained_models/model.pkl ${MODEL_DIR}/model.pkl
+COPY trained_models/model_artifacts.pkl ${MODEL_DIR}/model_artifacts.pkl
 
 
 COPY common_lib /app/common_lib
