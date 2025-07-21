@@ -1,0 +1,26 @@
+<nav class="bg-amber-50 shadow-md">
+    <div class="container mx-auto px-6 py-4">
+        <div class="flex items-center justify-between">
+            <a href="/" class="flex items-center space-x-2"> {# Link to homepage #}
+                <img src="/static/logo/pure logo.svg" alt="Home Harmony Icon" class="h-10 w-auto">
+                <img src="/static/logo/label.svg" alt="Home Harmony" class="h-6 w-auto">
+            </a>
+        <div class="flex items-center space-x-4">
+            {% if current_user %}
+                <span class="text-2xl font-bold text-amber-700">Hi, {{ current_user.name }}!</span>
+                <form action="/auth/logout" method="post" id="logoutForm" class="inline">
+                    <button type="submit" class="bg-amber-700 text-white px-4 py-2 rounded-lg font-bold hover:bg-amber-800 transition text-sm">
+                        Logout <i class="fas fa-sign-out-alt ml-1"></i>
+                    </button>
+                </form>
+
+            {% else %}
+                <a href="/" class="text-warm-brown-config hover:text-amber-700">Home</a>
+                <a href="/about" class="text-warm-brown-config hover:text-amber-700">About</a>
+                <button onclick="openModal()" class="bg-amber-700 text-white px-4 py-2 rounded-lg font-bold hover:bg-amber-800 transition text-sm">
+                    Login | Register
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</nav>

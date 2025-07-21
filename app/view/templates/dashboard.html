@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}
+My Dashboard
+{% endblock %}
+
+{% block content %}
+<section class="py-12 bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="bg-white shadow rounded-lg p-6 mb-8">
+            <h1 class="text-2xl md:text-3xl font-bold mb-2 text-warm-brown-config">
+                Welcome back, {{ current_user.name if current_user else 'User' }}!
+            </h1>
+            <p class="text-md text-gray-600 mb-4">Here's an overview of your account.</p>
+            <div class="bg-amber-50 border border-amber-200 p-4 rounded-md">
+                <h2 class="text-lg font-semibold text-amber-800 mb-1">Current Balance</h2>
+                <p class="text-2xl font-bold text-amber-800">
+                    {{ "%.2f"|format(balance.amount) if balance else '0.00' }} Units
+                </p>
+                <a
+                    onclick="openAddFundsModal('{{ current_user.id }}')"
+                    class="text-sm text-amber-700 hover:text-amber-800 hover:underline mt-1 inline-block">
+                     Add Funds
+                </a>
+                <a href="/transactions" class="text-sm text-amber-700 hover:text-amber-800 hover:underline mt-1 ml-4 inline-block">View History</a>
+            </div>
+        </div>
+        <div class="bg-white shadow rounded-lg p-6 mb-8">
+            <div class="flex justify-between items-center mb-4">
+                 <h2 class="text-xl font-semibold text-warm-brown-config">My Houses</h2>
+                 <a href="/houses/new" class="bg-amber-700 text-white px-3 py-1 rounded-md text-sm font-medium hover:bg-amber-800 transition">
+                     <i class="fas fa-plus mr-1"></i> Add House
+                 </a>
+            </div>
+            {% if houses %}
+                <ul class="space-y-3">
+                    {% for house in houses %}
+                        <li class="bg-light-beige-config p-4 rounded-lg border border-amber-100 shadow-sm flex flex-col sm:flex-row justify-between sm:items-center">
+                            <div class="mb-2 sm:mb-0">
+                                <p class="font-semibold text-warm-brown-config">
+                                    {{ house.floors }} Floor(s), {{ house.square_meters }} m²
+                                </p>
+                                 <p class="text-sm text-gray-600 mt-1">
+                                    Rooms: {{ house.rooms | join(', ') | default('N/A') }}
+                                 </p>
+                            </div>
+                            <div class="flex space-x-2">
+                                <a href="/houses/{{ house.id }}" title="View House Details" class="text-amber-700 hover:text-amber-800 px-2 py-1 rounded hover:bg-amber-100 transition">
+                                    <i class="fas fa-eye"></i> <span class="hidden sm:inline">Details</span>
+                                </a>
+                                <button onclick="queuePrediction('{{ current_user.id }}', '{{ house.id }}')" title="Generate Cleaning Schedule" class="text-green-700 hover:text-green-800 px-2 py-1 rounded hover:bg-green-100 transition">
+                                     <i class="fas fa-magic"></i> <span class="hidden sm:inline">Predict</span>
+                                </button>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="text-center py-6 bg-gray-50 rounded-md border border-dashed border-gray-300">
+                    <i class="fas fa-home text-3xl text-gray-400 mb-2"></i>
+                    <p class="text-gray-500">You haven't added any houses yet.</p>
+                    <a href="/houses/new" class="mt-2 text-amber-700 hover:underline font-medium">Add your first house</a>
+                </div>
+            {% endif %}
+        </div>
+        <div class="bg-white shadow rounded-lg p-6">
+             <h2 class="text-xl font-semibold text-warm-brown-config mb-4">Prediction History</h2>
+            {% if predictions %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 border border-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">House (ID)</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID</th>
+                                <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for prediction in predictions %}
+                                <tr>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                        {{ prediction.timestamp.strftime('%Y-%m-%d %H:%M') if prediction.timestamp else 'N/A' }}
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 font-medium" title="{{ prediction.house_id }}">
+                                        {{ prediction.house_id|string|truncate(15, True, '...') }}
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                        {% set status_val = prediction.status.value %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                            {% if prediction.status == PredictionStatus.COMPLETED %} bg-green-100 text-green-800
+                                            {% elif prediction.status == PredictionStatus.FAILED %} bg-red-100 text-red-800
+                                            {% elif prediction.status == PredictionStatus.PROCESSING %} bg-yellow-100 text-yellow-800
+                                            {% elif prediction.status == PredictionStatus.QUEUED %} bg-blue-100 text-blue-800
+                                            {% else %} bg-gray-100 text-gray-800 {% endif %}">
+                                            {{ status_val }}
+                                        </span>
+                                    </td>
+                                     <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono" title="{{ prediction.task_id }}">
+                                        {{ prediction.task_id|string|truncate(8, True, '...') }}
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-center text-sm font-medium">
+                                         <a href="/prediction-details/{{prediction.task_id}}" class="text-amber-600 hover:text-amber-900 hover:underline" title="View Details">
+                                             <i class="fas fa-search"></i> View
+                                         </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                 <div class="text-center py-6 bg-gray-50 rounded-md border border-dashed border-gray-300">
+                    <i class="fas fa-history text-3xl text-gray-400 mb-2"></i>
+                    <p class="text-gray-500">You have no prediction history yet.</p>
+                     <p class="text-sm text-gray-400 mt-1">Add a house and generate a schedule!</p>
+                </div>
+            {% endif %}
+        </div>
+
+    </div>
+</section>
+<script>
+    async function queuePrediction(userId, houseId) {
+        if (!confirm(`Generate a new cleaning schedule for house ID ${houseId.substring(0,8)}...? This may incur charges.`)) {
+            return;
+        }
+
+        console.log(`Queueing prediction for user: ${userId}, house: ${houseId}`);
+        try {
+            const response = await fetch(`/api/predictions/?user_id=${userId}&house_id=${houseId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                alert(`Prediction task queued successfully! Task ID: ${result.task_id}. Refreshing...`);
+                 window.location.reload();
+            } else {
+                const errorDetail = result.detail || `Error ${response.status}`;
+                console.error('Prediction queueing failed:', errorDetail);
+                alert(`Failed to queue prediction: ${errorDetail}`);
+            }
+        } catch (error) {
+            console.error('Error submitting prediction request:', error);
+            alert('An error occurred while trying to queue the prediction. Please try again.');
+        }
+    }
+</script>
+{% endblock %}
