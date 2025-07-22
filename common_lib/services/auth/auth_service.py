@@ -62,11 +62,7 @@ async def get_current_user_optional(
 async def get_current_active_user(current_user: User = Depends(get_current_user_optional)):
     if current_user is None:
         logger.info("Mandatory authentication failed (checked cookie). Raising 401.")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return None
     logger.info(f"Mandatory authentication successful for user: {current_user.email} -- {current_user.role}")
     return current_user
 

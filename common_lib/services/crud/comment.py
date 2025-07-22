@@ -102,8 +102,8 @@ class CommentService:
             )
 
             message = {
-                'task_id': comment_id,  # Используем ID комментария как ID задачи
-                'task_type': 'text_classification',  # Указываем тип задачи
+                'task_id': comment_id,
+                'task_type': 'text_classification',
                 'text': text,
                 'user_id': user_id,
                 'timestamp': datetime.utcnow().isoformat()

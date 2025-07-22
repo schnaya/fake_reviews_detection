@@ -64,10 +64,8 @@ class MLModel:
             df = pd.DataFrame({'text_': [text]})
             X_vectorized = self.pipeline.transform(df)
 
-            # Получаем вероятности
             probabilities = self.model.predict_proba(X_vectorized)[0]
 
-            # Формируем результат
             result = {}
             for idx, prob in enumerate(probabilities):
                 label_name = self.reverse_label_mapping.get(idx, f"class_{idx}")

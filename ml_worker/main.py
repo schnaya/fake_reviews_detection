@@ -10,6 +10,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session
 
 from common_lib.database.config import get_settings
+from common_lib.database.database import get_session
+from common_lib.models import ModerationStatus, Comment
+from common_lib.models.Comment import CommentUpdateModeration
+from common_lib.services.crud.comment import moderate_comment
 from tasks import MLModel
 
 logging.basicConfig(
@@ -18,7 +22,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# RabbitMQ настройки
 RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'rabbitmq')
 RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
 RABBITMQ_USER = os.environ.get('RABBITMQ_USER', 'user')
@@ -81,7 +84,7 @@ def callback(ch, method, properties, body):
     Callback функция для обработки сообщений из RabbitMQ
     """
     logger.info(f"Получено сообщение, delivery_tag: {method.delivery_tag}")
-    db: Session = SessionLocal()
+    session: Session = next(get_session())
     task_id_str = None
     task_id = None
 
@@ -97,16 +100,20 @@ def callback(ch, method, properties, body):
             task_id = uuid.UUID(task_id_str)
 
         if task_type == "text_classification":
-            result = process_text_classification_task(message_data, db)
+            result = process_text_classification_task(message_data, session)
             logger.info(f"Задача {task_id_str} успешно обработана")
-            logger.info(f"Результат: {result['prediction']}")
+            label = result['prediction']
+            logger.info(f"Результат: {label}")
 
         else:
             raise ValueError(f"Неизвестный тип задачи: {task_type}")
 
-        # Здесь можно сохранить результат в БД
-        # update_task_result(db, task_id, result)
-
+        if label == 0:
+            new_status = ModerationStatus.REJECTED
+        else:
+            new_status = ModerationStatus.APPROVED
+        if new_status:
+            moderate_comment(session, task_id, CommentUpdateModeration(moderation_status=new_status))
         ch.basic_ack(delivery_tag=method.delivery_tag)
         logger.info(f"Задача {task_id_str} завершена успешно")
 
@@ -123,7 +130,7 @@ def callback(ch, method, properties, body):
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
     finally:
-        db.close()
+        session.close()
 
 
 channel.basic_qos(prefetch_count=1)

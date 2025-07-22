@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     INITIAL_BALANCE: int = 10
 
+    ENVIRONMENT: str = "development"
+
 
 
     @property

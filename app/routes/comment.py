@@ -12,8 +12,6 @@ from common_lib.models.User import User, RoleEnum
 from common_lib.services.crud.comment import moderate_comment
 
 comment_router = APIRouter(
-    prefix="/comments",
-    tags=["Comments"]
 )
 
 

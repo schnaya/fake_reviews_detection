@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Product Details{% endblock %}
+
+{% block content %}
+<div id="product-details">
+</div>
+<hr>
+<div id="comments-section">
+    <h3 class="mb-3">Comments</h3>
+    <div id="comment-list" class="mb-4">
+    </div>
+
+    <div id="add-comment-form-container">
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const productId = '{{ product_id }}';
+    const currentUser = {{ (current_user.model_dump_json() if current_user else 'null') | safe }};
+    const currentUserId = currentUser ? currentUser.id : null;
+    const currentUserRole = currentUser ? currentUser.role : null;
+    console.log(currentUser)
+
+    async function fetchProductAndComments() {
+        try {
+            const response = await fetch(`/api/products/${productId}/with-comments`);
+            if (!response.ok) throw new Error('Product not found.');
+            const product = await response.json();
+
+            document.title = `${escapeHTML(product.name)} - Product Details`;
+
+            const productDetails = document.getElementById('product-details');
+            productDetails.innerHTML = `
+                <h1>${escapeHTML(product.name)}</h1>
+                <p class="lead">${escapeHTML(product.description)}</p>
+            `;
+
+            renderComments(product.comments);
+
+            if (currentUser) {
+                renderCommentForm();
+            } else {
+                document.getElementById('add-comment-form-container').innerHTML = `<p><a href="/login?redirect=${window.location.pathname}">Log in</a> to leave a comment.</p>`
+            }
+
+        } catch (error) {
+            showAlert(error.message, 'danger');
+            document.getElementById('product-details').innerHTML = `<p class="text-danger">Failed to load product.</p>`;
+        }
+    }
+
+    function renderComments(comments) {
+        const commentList = document.getElementById('comment-list');
+        commentList.innerHTML = '';
+        if (comments.length === 0) {
+            commentList.innerHTML = '<p>No comments yet. Be the first!</p>';
+            return;
+        }
+
+        comments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        comments.forEach(comment => {
+
+            let statusBadge = '';
+            if (comment.moderation_status === 'not_checked') {
+                statusBadge = '<span class="badge bg-info text-dark ms-2">Pending</span>';
+            } else if (comment.moderation_status === 'approved') {
+                statusBadge = '<span class="badge bg-success ms-2">Approved</span>';
+            } else if (comment.moderation_status === 'rejected') {
+                statusBadge = '<span class="badge bg-danger ms-2">Rejected</span>';
+            }
+
+            const isAuthor = comment.user_id === currentUserId;
+            const isAdmin = currentUserRole === 'admin';
+
+            const deleteButton = (isAuthor || isAdmin) ?
+                `<button class="btn btn-sm btn-outline-danger" onclick="deleteComment('${comment.id}')">Delete</button>` : '';
+
+            const moderationControls = isAdmin ? `
+                <div class="btn-group btn-group-sm ms-2" role="group">
+                    <button class="btn ${comment.is_fake ? 'btn-success' : 'btn-outline-secondary'}" onclick="moderateComment('${comment.id}', 'approved')">Not Fake</button>
+                    <button class="btn ${comment.is_fake ? 'btn-outline-secondary' : 'btn-warning'}" onclick="moderateComment('${comment.id}', 'rejected')">Fake</button>
+                </div>
+            ` : '';
+
+            const fakeBadge = comment.is_fake ? '<span class="badge bg-warning text-dark ms-2">Marked as fake</span>' : '';
+
+             const card = `
+            <div class="card mb-3" id="comment-${comment.id}">
+                <div class="card-body">
+                    <p class="card-text">${escapeHTML(comment.text)}</p>
+                    <footer class="blockquote-footer">
+                        Rating: ${comment.rating} ★ |
+                        ${statusBadge}
+                    </footer>
+                </div>
+                <div class="card-footer bg-transparent border-top-0 text-end">
+                    ${deleteButton}
+                    ${moderationControls}
+                </div>
+            </div>
+        `;
+            commentList.innerHTML += card;
+        });
+    }
+
+    function renderCommentForm() {
+    const formContainer = document.getElementById('add-comment-form-container');
+    formContainer.innerHTML = `
+        <h4>Leave a Comment</h4>
+        <form id="add-comment-form">
+            <div class="mb-3">
+                <label for="comment-rating" class="form-label">Rating</label>
+                <select class="form-select" id="comment-rating" required>
+                    <option value="5">5 - Excellent</option>
+                    <option value="4">4 - Good</option>
+                    <option value="3">3 - Average</option>
+                    <option value="2">2 - Poor</option>
+                    <option value="1">1 - Terrible</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="comment-text" class="form-label">Comment</label>
+                <textarea class="form-control" id="comment-text" rows="3" required placeholder="Your comment..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+    `;
+    document.getElementById('add-comment-form').addEventListener('submit', handleAddComment);
+}
+
+    async function handleAddComment(e) {
+    e.preventDefault();
+    const text = document.getElementById('comment-text').value;
+    const rating = document.getElementById('comment-rating').value;
+
+    if (!text.trim()) return;
+
+    try {
+        const response = await fetch('/api/comments/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                product_id: productId,
+                text: text,
+                rating: parseInt(rating, 10)
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail[0]?.msg || result.detail || 'Failed to add comment.');
+
+        showAlert('Comment added!', 'success');
+        document.getElementById('comment-text').value = '';
+        document.getElementById('comment-rating').value = '5';
+        fetchProductAndComments();
+    } catch (error) {
+        showAlert(error.message, 'danger');
+    }
+}
+    async function deleteComment(commentId) {
+        if (!confirm('Are you sure you want to delete this comment?')) return;
+        try {
+            const response = await fetch(`/api/comments/${commentId}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const result = await response.json();
+                throw new Error(result.detail || 'Failed to delete comment.');
+            }
+            showAlert('Comment deleted.', 'info');
+            document.getElementById(`comment-${commentId}`).remove();
+        } catch (error) {
+            showAlert(error.message, 'danger');
+        }
+    }
+
+    async function moderateComment(commentId, newStatus) {
+        try {
+            const response = await fetch(`/api/comments/${commentId}/moderate`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                moderation_status: newStatus
+            })
+        });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.detail || 'Moderation error.');
+
+            showAlert('Moderation status updated.', 'success');
+            fetchProductAndComments();
+        } catch (error) {
+            showAlert(error.message, 'danger');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', fetchProductAndComments);
+</script>
+{% endblock %}

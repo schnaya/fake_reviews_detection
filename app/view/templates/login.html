@@ -1,20 +1,56 @@
-<h1>Login 🫥</h1>
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
 
-{% for error in errors %}
-    <p style="color: red">{{ error }}</p>
-{% endfor %}
-<form action="/auth/login" method="post">
-    <p>
-        <p><label for="">Email</label></p>
-        <input type="email" name="username" value="{{ username }}" required>
-    </p>
-    <p>
-        <p><label for="">Password</label></p>
-        <input type="password" name="password" value="{{ password }}" required>
-    </p>
-    <input type="submit" value="Submit">
-</form>
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <h2 class="text-center mb-4">Log in to your account</h2>
+        <form id="login-form">
+            <div class="form-floating mb-3">
+                <input type="email" class="form-control" id="email" name="username" placeholder="name@example.com" required>
+                <label for="email">Email</label>
+            </div>
+            <div class="form-floating mb-3">
+                <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
+                <label for="password">Password</label>
+            </div>
+            <button type="submit" class="w-100 btn btn-lg btn-primary">Log In</button>
+        </form>
+        <p class="mt-3 text-center">
+            Don't have an account? <a href="/register">Sign up</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
 
-<hr>
+{% block scripts %}
+<script>
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
 
-{% include '_site_map.html' %}
+    try {
+        const response = await fetch('/api/auth/token', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.detail || 'Login failed. Check your email and password.');
+        }
+
+        localStorage.setItem('user_id', result.user_id);
+        showAlert('Login successful! Redirecting...', 'success');
+        const params = new URLSearchParams(window.location.search);
+        const redirectUrl = params.get('redirect');
+        window.location.href = redirectUrl || '/';
+
+    } catch (error) {
+        showAlert(error.message, 'danger');
+    }
+});
+</script>
+{% endblock %}
