@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}All Products - Product Reviews{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Product List</h1>
+</div>
+<div id="product-list" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+    <div class="col"><p>Loading products...</p></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const response = await fetch('/api/products/?skip=0&limit=10');
+            if (!response.ok) throw new Error('Failed to load products.');
+            const products = await response.json();
+            console.log('Products received from API:', products);
+
+            const productList = document.getElementById('product-list');
+            productList.innerHTML = '';
+            if (products.length === 0) {
+                productList.innerHTML = '<p>No products yet. <a href="/create-product">Create the first one!</a></p>';
+                return;
+            }
+            products.forEach(product => {
+                const productCard = `
+                    <div class="col">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">${escapeHTML(product.name)}</h5>
+                                <p class="card-text">${escapeHTML(product.description)}</p>
+                            </div>
+                            <div class="card-footer">
+                                <a href="/products/${product.id}" class="btn btn-primary">View Reviews</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                productList.innerHTML += productCard;
+            });
+        } catch (error) {
+            showAlert(error.message, 'danger');
+            document.getElementById('product-list').innerHTML = '<p class="text-danger">Error loading products.</p>';
+        }
+    });
+</script>
+{% endblock %}

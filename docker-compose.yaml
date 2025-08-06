@@ -1,0 +1,94 @@
+version: "3.8"
+
+services:
+  app:
+    container_name: app_container-coms
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    env_file: .env
+    volumes:
+      - ./app:/app
+      - ./common_lib:/app/common_lib
+      - ./tests:/app/tests
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - event-planner-network-coms
+
+  web-proxy:
+    image: nginx:1.25
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - event-planner-network-coms
+
+  ml_worker:
+    build:
+      context: .
+      dockerfile: ml_worker/Dockerfile
+    image: event-planner-ml-worker:latest
+    container_name: event-planner-ml-worker-coms
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - event-planner-network-coms
+
+  rabbitmq:
+    image: rabbitmq:3.13.1-management-alpine
+    container_name: rabbitmq_for_coms
+    hostname: rabbitmq
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit disk_free_limit 2147483648
+    volumes:
+      - rabbitmq_volume:/var/lib/rabbitmq
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "check_running" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - event-planner-network-coms
+
+  database:
+    image: postgres:17.4
+    volumes:
+      - postgres_volume:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    networks:
+      - event-planner-network-coms
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_volume:
+  rabbitmq_volume:
+networks:
+  event-planner-network-coms:
+    name: event-planner-network-coms
+    driver: bridge
